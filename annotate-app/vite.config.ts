@@ -27,7 +27,6 @@ export default defineConfig({
     }),
   ],
   build: {
-    watch: './vite.config.js',
     outDir: 'dist',
     rollupOptions: {
       input: {

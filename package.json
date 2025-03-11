@@ -1,7 +1,10 @@
 {
-  "devDependencies": {
-    "@tailwindcss/forms": "^0.5.7",
-    "@types/moment": "^2.13.0",
-    "moment": "^2.30.1"
+  "name": "annotate",
+  "version": "0.0.1",
+  "scripts": {
+    "start:frontend": "cd annotate-app && npm run dev",
+    "start:backend": "cd backend && python3 app.py",
+    "start": "concurrently \"npm run start:frontend\" \"npm run start:backend\"",
+    "build": "cd annotate-app && npm run build"
   }
 }

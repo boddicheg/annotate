@@ -1,4 +1,5 @@
 .venv/*
+venv/
 backend/static/assets/*.js
 backend/static/assets/*.css
 backend/static/assets/*.svg
@@ -8,3 +9,4 @@ backend/templates/*.html
 package-lock.json
 *.pyc
 *.sqlite*
+node_modules/*

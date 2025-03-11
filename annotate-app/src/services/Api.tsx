@@ -14,12 +14,12 @@ export const fetchProjects = async (): Promise<Array<ProjectsInterface>> => {
   return await response.json();
 };
 
-interface NewProjectData {
+export interface NewProjectData {
   name: string;
   description: string;
 }
 
-interface ApiResponse {
+export interface ApiResponse {
   success: boolean;
   message: string;
 }

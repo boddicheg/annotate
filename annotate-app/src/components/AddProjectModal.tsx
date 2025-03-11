@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Modal from "./Modal";
 
-import { sendAddNewProject, NewProjectData } from "../services/Api";
+import { sendAddNewProject } from "../services/Api";
 
 interface AddProjectModalProps {
   onAddProject: (msg: string) => void;
@@ -9,7 +9,6 @@ interface AddProjectModalProps {
 
 const AddProjectModal: React.FC<AddProjectModalProps> = ({ onAddProject }) => {
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState<NewProjectData>({ name: '', description: '' });
   const [response, setResponse] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [name, setName] = useState<string>('');
@@ -25,11 +24,6 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ onAddProject }) => {
     setError("");
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -38,9 +32,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ onAddProject }) => {
     const data = { name, description };
 
     try {
-      const result = await sendAddNewProject(data);
-      // console.log(data)
-      // setResponse(result.message);
+      await sendAddNewProject(data);
       setShowModal(false);
       onAddProject("");
     } catch (err) {
