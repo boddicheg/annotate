@@ -95,3 +95,30 @@ export const sendAddNewProject = async (data: NewProjectData): Promise<ApiRespon
 
   return response.json();
 };
+
+export const deleteProject = async (projectUuid: string): Promise<ApiResponse> => {
+  const token = localStorage.getItem('token');
+  
+  if (!token) {
+    throw new Error("Authentication token is missing");
+  }
+  
+  const response = await fetch(`/api/projects/uuid/${projectUuid}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    }
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Authentication failed: Invalid or expired token");
+    } else if (response.status === 404) {
+      throw new Error("Project not found");
+    }
+    throw new Error('Failed to delete project');
+  }
+
+  return await response.json();
+};

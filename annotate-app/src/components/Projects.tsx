@@ -1,23 +1,63 @@
-import React, { useEffect, useState } from "react";
-import { fetchProjects, ProjectsInterface } from "../services/Api";
+import React, { useEffect, useState, useRef } from "react";
+import { fetchProjects, ProjectsInterface, deleteProject } from "../services/Api";
 import { useNavigate } from "react-router-dom";
 import moment from 'moment';
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 // import AddProjectModal from './AddProjectModal';
 
 export const ProjectsList = ({
   projects,
+  onDeleteProject
 }: {
   projects?: Array<ProjectsInterface>;
+  onDeleteProject: (projectUuid: string) => void;
 }) => {
   const navigate = useNavigate();
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { showToast } = useToast();
   
   const handleProjectClick = (projectUuid: string) => {
     navigate(`/projects/${projectUuid}`);
   };
   
+  const toggleDropdown = (e: React.MouseEvent, projectUuid: string) => {
+    e.stopPropagation();
+    setActiveDropdown(activeDropdown === projectUuid ? null : projectUuid);
+  };
+  
+  const handleCopyUuid = (e: React.MouseEvent, projectUuid: string) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(projectUuid);
+    setActiveDropdown(null);
+    showToast("UUID copied to clipboard!", "success");
+  };
+  
+  const handleDeleteProject = (e: React.MouseEvent, projectUuid: string) => {
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
+      onDeleteProject(projectUuid);
+    }
+    setActiveDropdown(null);
+  };
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setActiveDropdown(null);
+      }
+    };
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+  
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4" ref={dropdownRef}>
       {projects &&
         projects?.map((project) => (
           <div 
@@ -39,17 +79,36 @@ export const ProjectsList = ({
                   <h3 className="text-lg font-medium text-gray-900">{project.name}</h3>
                   <p className="mt-1 text-sm text-gray-500 line-clamp-2">{project.description}</p>
                 </div>
-                <button 
-                  className="text-gray-400 hover:text-gray-500"
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent triggering the card click
-                    // Add menu functionality here if needed
-                  }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                  </svg>
-                </button>
+                <div className="relative">
+                  <button 
+                    className="text-gray-400 hover:text-gray-500"
+                    onClick={(e) => toggleDropdown(e, project.uuid)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                    </svg>
+                  </button>
+                  
+                  {/* Dropdown Menu */}
+                  {activeDropdown === project.uuid && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
+                      <div className="py-1">
+                        <button
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={(e) => handleCopyUuid(e, project.uuid)}
+                        >
+                          Copy UUID
+                        </button>
+                        <button
+                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                          onClick={(e) => handleDeleteProject(e, project.uuid)}
+                        >
+                          Delete Project
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               
               {/* Project Stats */}
@@ -86,6 +145,7 @@ const Projects: React.FC = () => {
   const [fetchAttempted, setFetchAttempted] = useState<boolean>(false);
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
 
   const getProjects = async () => {
     if (!isAuthenticated) {
@@ -124,10 +184,18 @@ const Projects: React.FC = () => {
     }
   };
 
-  // const onAddProject = (message: string) => {
-  //   console.log(message)
-  //   getProjects();
-  // };
+  const handleDeleteProject = async (projectUuid: string) => {
+    try {
+      await deleteProject(projectUuid);
+      // Update the UI by filtering out the deleted project
+      setProjects(projects.filter(project => project.uuid !== projectUuid));
+      showToast("Project deleted successfully", "success");
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      setError("Failed to delete project");
+      showToast("Failed to delete project", "error");
+    }
+  };
 
   useEffect(() => {
     // Only fetch projects if authenticated and not already loading
@@ -158,7 +226,7 @@ const Projects: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Projects list */}
-      <ProjectsList projects={projects} />
+      <ProjectsList projects={projects} onDeleteProject={handleDeleteProject} />
     </div>
   );
 };

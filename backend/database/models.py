@@ -184,4 +184,19 @@ class DBSession:
             "type": project.type if hasattr(project, 'type') else "object-detection",
             "user_id": project.user_id
         }
+        
+    def delete_project_by_uuid(self, project_uuid, user_id=None):
+        query = self.session.query(Projects).filter_by(uuid=project_uuid)
+        
+        if user_id:
+            query = query.filter_by(user_id=user_id)
+            
+        project = query.first()
+        
+        if not project:
+            return False
+            
+        self.session.delete(project)
+        self.session.commit()
+        return True
 # -----------------------------------------------------------------------------

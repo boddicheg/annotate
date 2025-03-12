@@ -108,6 +108,30 @@ def api_project_get_by_uuid(project_uuid):
         
     return jsonify(project), 200
 
+@app.route('/api/projects/uuid/<string:project_uuid>', methods=['DELETE'])
+@token_required
+def api_project_delete_by_uuid(project_uuid):
+    user_id = request.current_user['id']
+    
+    # Check if project exists first
+    project = g_projects.get_project_by_uuid(project_uuid, user_id)
+    if not project:
+        return jsonify({"error": "Project not found"}), 404
+    
+    # Delete the project
+    success = g_projects.delete_project_by_uuid(project_uuid, user_id)
+    
+    if success:
+        return jsonify({
+            "message": "Project deleted successfully",
+            "success": True
+        }), 200
+    else:
+        return jsonify({
+            "error": "Failed to delete project",
+            "success": False
+        }), 500
+
 @app.route('/api/projects', methods=['POST'])
 @token_required
 def api_projects_add():

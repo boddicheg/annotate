@@ -15,5 +15,8 @@ class ProjectsController():
     def get_project_by_uuid(self, project_uuid, user_id=None):
         return self.database.get_project_by_uuid(project_uuid, user_id)
     
+    def delete_project_by_uuid(self, project_uuid, user_id=None):
+        return self.database.delete_project_by_uuid(project_uuid, user_id)
+    
     def add_project(self, data, user_id=None):
         return self.database.add_project(data, user_id)
