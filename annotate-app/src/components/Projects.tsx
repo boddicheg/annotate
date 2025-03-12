@@ -10,11 +10,21 @@ export const ProjectsList = ({
 }: {
   projects?: Array<ProjectsInterface>;
 }) => {
+  const navigate = useNavigate();
+  
+  const handleProjectClick = (projectUuid: string) => {
+    navigate(`/projects/${projectUuid}`);
+  };
+  
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
       {projects &&
         projects?.map((project) => (
-          <div key={project.id} className="bg-white rounded-lg shadow overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+          <div 
+            key={project.uuid} 
+            className="bg-white rounded-lg shadow overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => handleProjectClick(project.uuid)}
+          >
             {/* Project Header with thumbnail */}
             <div className="h-32 bg-gradient-to-r from-indigo-500 to-purple-600 relative">
               <div className="absolute top-3 left-3 bg-gray-800 bg-opacity-70 text-white text-xs px-2 py-1 rounded">
@@ -29,7 +39,13 @@ export const ProjectsList = ({
                   <h3 className="text-lg font-medium text-gray-900">{project.name}</h3>
                   <p className="mt-1 text-sm text-gray-500 line-clamp-2">{project.description}</p>
                 </div>
-                <button className="text-gray-400 hover:text-gray-500">
+                <button 
+                  className="text-gray-400 hover:text-gray-500"
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent triggering the card click
+                    // Add menu functionality here if needed
+                  }}
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                   </svg>

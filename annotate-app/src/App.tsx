@@ -4,6 +4,7 @@ import Sidebar from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 import Projects from "./components/Projects";
 import CreateProject from "./components/CreateProject";
+import ProjectDetail from "./components/ProjectDetail";
 import Login from "./components/Login";
 import Register from "./components/Register";
 import Settings from "./components/Settings";
@@ -65,6 +66,15 @@ function App() {
                 <div className="flex-1">
                   <Header />
                   <MainContent><CreateProject /></MainContent>
+                </div>
+              </div>
+            } />
+            <Route path="/projects/:projectUuid" element={
+              <div className="flex min-h-screen bg-gray-50">
+                <Sidebar />
+                <div className="flex-1">
+                  <Header />
+                  <MainContent><ProjectDetail /></MainContent>
                 </div>
               </div>
             } />

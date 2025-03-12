@@ -130,6 +130,7 @@ class DBSession:
         result = []
         for project in projects:
             result.append({
+                "id": project.id,
                 "uuid": project.uuid,
                 "name": project.name,
                 "description": project.description,
@@ -139,4 +140,48 @@ class DBSession:
                 "user_id": project.user_id
             })
         return result
+        
+    def get_project_by_id(self, project_id, user_id=None):
+        query = self.session.query(Projects).filter_by(id=project_id)
+        
+        if user_id:
+            query = query.filter_by(user_id=user_id)
+            
+        project = query.first()
+        
+        if not project:
+            return None
+            
+        return {
+            "id": project.id,
+            "uuid": project.uuid,
+            "name": project.name,
+            "description": project.description,
+            "resources": project.resources,
+            "date_updated": project.date_updated,
+            "type": project.type if hasattr(project, 'type') else "object-detection",
+            "user_id": project.user_id
+        }
+        
+    def get_project_by_uuid(self, project_uuid, user_id=None):
+        query = self.session.query(Projects).filter_by(uuid=project_uuid)
+        
+        if user_id:
+            query = query.filter_by(user_id=user_id)
+            
+        project = query.first()
+        
+        if not project:
+            return None
+            
+        return {
+            "id": project.id,
+            "uuid": project.uuid,
+            "name": project.name,
+            "description": project.description,
+            "resources": project.resources,
+            "date_updated": project.date_updated,
+            "type": project.type if hasattr(project, 'type') else "object-detection",
+            "user_id": project.user_id
+        }
 # -----------------------------------------------------------------------------

@@ -25,31 +25,35 @@ const Header: React.FC = () => {
   
   // Determine the current page title based on the path
   const getPageTitle = () => {
-    switch (location.pathname) {
-      case "/":
-        return "Dashboard";
-      case "/projects":
-        return "Projects";
-      case "/projects/create":
-        return "Create Project";
-      case "/workflows":
-        return "Workflows";
-      case "/monitoring":
-        return "Monitoring";
-      case "/deployments":
-        return "Deployments";
-      case "/settings":
-        return "Settings";
-      default:
-        return "Dashboard";
+    const path = location.pathname;
+    
+    if (path === "/") {
+      return "Dashboard";
+    } else if (path === "/projects") {
+      return "Projects";
+    } else if (path === "/projects/create") {
+      return "Create Project";
+    } else if (path.match(/^\/projects\/\d+$/)) {
+      return "Project Details";
+    } else if (path === "/workflows") {
+      return "Workflows";
+    } else if (path === "/monitoring") {
+      return "Monitoring";
+    } else if (path === "/deployments") {
+      return "Deployments";
+    } else if (path === "/settings") {
+      return "Settings";
+    } else {
+      return "Dashboard";
     }
   };
 
   // Only show the search bar and filters on the projects page
   const showProjectControls = location.pathname === "/projects";
   
-  // Don't show action buttons on the create project page
-  const showActionButtons = location.pathname === "/projects";
+  // Don't show action buttons on the create project page or project detail page
+  const showActionButtons = location.pathname === "/projects" && 
+                           !location.pathname.match(/^\/projects\/\d+$/);
 
   const handleLogout = () => {
     logout();

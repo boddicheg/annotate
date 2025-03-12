@@ -86,6 +86,28 @@ def api_projects_get():
     user_id = request.current_user['id']
     return jsonify(g_projects.get_projects(user_id)), 200
 
+@app.route('/api/projects/<int:project_id>', methods=['GET'])
+@token_required
+def api_project_get(project_id):
+    user_id = request.current_user['id']
+    project = g_projects.get_project_by_id(project_id, user_id)
+    
+    if not project:
+        return jsonify({"error": "Project not found"}), 404
+        
+    return jsonify(project), 200
+
+@app.route('/api/projects/uuid/<string:project_uuid>', methods=['GET'])
+@token_required
+def api_project_get_by_uuid(project_uuid):
+    user_id = request.current_user['id']
+    project = g_projects.get_project_by_uuid(project_uuid, user_id)
+    
+    if not project:
+        return jsonify({"error": "Project not found"}), 404
+        
+    return jsonify(project), 200
+
 @app.route('/api/projects', methods=['POST'])
 @token_required
 def api_projects_add():
