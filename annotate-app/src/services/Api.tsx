@@ -4,6 +4,7 @@ export interface ProjectsInterface {
   description: string;
   resources: number;
   date_updated: string;
+  type?: string;
 }
 
 export const fetchProjects = async (): Promise<Array<ProjectsInterface>> => {
@@ -17,6 +18,7 @@ export const fetchProjects = async (): Promise<Array<ProjectsInterface>> => {
 export interface NewProjectData {
   name: string;
   description: string;
+  type?: string;
 }
 
 export interface ApiResponse {

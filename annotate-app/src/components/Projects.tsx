@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { fetchProjects, ProjectsInterface } from "../services/Api";
 import moment from 'moment';
-
-import AddProjectModal from './AddProjectModal';
-
+// import AddProjectModal from './AddProjectModal';
 
 export const ProjectsList = ({
   projects,
@@ -11,64 +9,53 @@ export const ProjectsList = ({
   projects?: Array<ProjectsInterface>;
 }) => {
   return (
-    <div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
       {projects &&
         projects?.map((project) => (
-          <li className="flex justify-between gap-x-6 py-3 px-3 my-4 border border-slate-100 bg-slate-50 shadow-md rounded hover:shadow-lg cursor-pointer">
-            <div className="flex min-w-0 gap-x-4">
-              <div className="min-w-0 content-center ">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="size-8 fill-indigo-500 stroke-indigo-700"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m9 13.5 3 3m0 0 3-3m-3 3v-6m1.06-4.19-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"
-                  />
-                </svg>
-              </div>
-              <div className="min-w-0 flex-auto">
-                <p className="text-lg font-bold leading-6 text-gray-900">
-                  {project?.name}
-                </p>
-                <p className="mt-1 truncate text-xs leading-5 text-gray-500">
-                  {project?.description}
-                </p>
+          <div key={project.id} className="bg-white rounded-lg shadow overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+            {/* Project Header with thumbnail */}
+            <div className="h-32 bg-gradient-to-r from-indigo-500 to-purple-600 relative">
+              <div className="absolute top-3 left-3 bg-gray-800 bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                {project.type === 'classification' ? 'Classification' : 'Object Detection'}
               </div>
             </div>
-            <div className="inline-flex">
-
-              <div className="hidden shrink-0 sm:flex sm:flex-col sm:items-end inline-flex">
-                <p className="text-sm leading-6 text-gray-900">
-                  Resourses: {project?.resources}
-                </p>
-                <p className="mt-1 text-xs leading-5 text-gray-500">
-                  Updated: {moment(project?.date_updated).fromNow()}
-                </p>
+            
+            {/* Project Info */}
+            <div className="p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">{project.name}</h3>
+                  <p className="mt-1 text-sm text-gray-500 line-clamp-2">{project.description}</p>
+                </div>
+                <button className="text-gray-400 hover:text-gray-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                  </svg>
+                </button>
               </div>
-              <div className="max-w-24 content-center ml-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="size-8 stroke-indigo-700"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m8.25 4.5 7.5 7.5-7.5 7.5"
-                  />
-                </svg>
+              
+              {/* Project Stats */}
+              <div className="mt-4 flex items-center text-sm text-gray-500 space-x-4">
+                <div className="flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {project.resources} Images
+                </div>
+                <div className="flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                  </svg>
+                  1 Model
+                </div>
+              </div>
+              
+              {/* Last Updated */}
+              <div className="mt-4 text-xs text-gray-500">
+                Edited {moment(project.date_updated).fromNow()}
               </div>
             </div>
-          </li>
+          </div>
         ))}
     </div>
   );
@@ -80,55 +67,51 @@ const Projects: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const getProjects = async () => {
-	try {
-	  const data = await fetchProjects();
-	  setProjects(data);
-	} catch (err) {
-	  if (err instanceof Error) {
-		setError(err.message);
-	  } else {
-		setError("An unexpected error occurred");
-	  }
-	} finally {
-	  setLoading(false);
-	}
+    try {
+      const data = await fetchProjects();
+      setProjects(data);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unexpected error occurred");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const onAddProject = (message: string) => {
-    console.log(message)
-	getProjects();
-  };
+  // const onAddProject = (message: string) => {
+  //   console.log(message)
+  //   getProjects();
+  // };
 
   useEffect(() => {
     getProjects();
   }, []);
 
   if (loading) {
-    return <p>Loading...</p>;
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
   }
 
   if (error) {
-    return <p>Error: {error}</p>;
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <strong className="font-bold">Error: </strong>
+        <span className="block sm:inline">{error}</span>
+      </div>
+    );
   }
 
   return (
-    <>
-      <header className="bg-white shadow">
-        <div className="flex flex-row place-content-between mx-auto max-w-7xl px-3 py-3">
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">
-            Projects
-          </h2>
-          <span className="sm:ml-3">
-			<AddProjectModal onAddProject={onAddProject} />
-          </span>
-        </div>
-      </header>
-      <div>
-        <ul role="list" className="flex flex-col divide-y divide-gray-100">
-          <ProjectsList projects={projects} />
-        </ul>
-      </div>
-    </>
+    <div className="space-y-6">
+      {/* Projects list */}
+      <ProjectsList projects={projects} />
+    </div>
   );
 };
 

@@ -19,6 +19,7 @@ class Projects(Base):
     description = Column(String)
     resources = Column(Integer, nullable=False)
     date_updated = Column(String, nullable=False)
+    type = Column(String, default='object-detection')
 
 # -----------------------------------------------------------------------------
     
@@ -43,13 +44,18 @@ class DBSession:
                 print(f"-> Can't find key {k} in params")
                 return
 
+        project_type = data.get("type", "object-detection")
+        
         self.session.add(Projects(
             uuid=str(uuid.uuid4()),  
             name=data["name"],
             description=data["description"],
             resources=0,
-            date_updated=datetime.datetime.now()
+            date_updated=datetime.datetime.now(),
+            type=project_type
         ))
+        
+        self.session.commit()
 
     def get_projects(self):
         projects = self.session.query(Projects).all()
@@ -60,7 +66,8 @@ class DBSession:
                 "name": project.name,
                 "description": project.description,
                 "resources": project.resources,
-                "date_updated": project.date_updated
+                "date_updated": project.date_updated,
+                "type": project.type if hasattr(project, 'type') else "object-detection"
             })
         return result
 # -----------------------------------------------------------------------------
