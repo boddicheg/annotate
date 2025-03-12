@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchProjectById, ProjectsInterface } from "../services/Api";
 import { useAuth } from "../context/AuthContext";
+import FileUpload from './FileUpload';
+import ImageGallery from './ImageGallery';
 // import moment from 'moment';
 
 const ProjectDetail: React.FC = () => {
@@ -12,7 +14,34 @@ const ProjectDetail: React.FC = () => {
   const [project, setProject] = useState<ProjectsInterface | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("data");
+  const [activeTab, setActiveTab] = useState<string>("upload");
+
+  const fetchProjectData = async () => {
+    if (!projectUuid) {
+      setError('Project ID is missing');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const projectData = await fetchProjectById(projectUuid);
+      setProject(projectData);
+      setLoading(false);
+    } catch (err: any) {
+      console.error('Error fetching project:', err);
+      
+      // Check if it's an authentication error
+      if (err.message && (err.message.includes('Authentication') || err.message.includes('token'))) {
+        navigate('/login');
+      } else if (err.message && err.message.includes('not found')) {
+        setError('Project not found');
+      } else {
+        setError('Failed to load project');
+      }
+      
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const getProject = async () => {
@@ -21,34 +50,16 @@ const ProjectDetail: React.FC = () => {
         return;
       }
 
-      try {
-        if (!projectUuid) {
-          setError('Project ID is missing');
-          setLoading(false);
-          return;
-        }
-
-        const projectData = await fetchProjectById(projectUuid);
-        setProject(projectData);
-        setLoading(false);
-      } catch (err: any) {
-        console.error('Error fetching project:', err);
-        
-        // Check if it's an authentication error
-        if (err.message && (err.message.includes('Authentication') || err.message.includes('token'))) {
-          navigate('/login');
-        } else if (err.message && err.message.includes('not found')) {
-          setError('Project not found');
-        } else {
-          setError('Failed to load project');
-        }
-        
-        setLoading(false);
-      }
+      await fetchProjectData();
     };
 
     getProject();
   }, [projectUuid, navigate, isAuthenticated]);
+
+  const handleUploadSuccess = () => {
+    // Refresh project data to update resources count
+    fetchProjectData();
+  };
 
   if (loading) {
     return (
@@ -106,33 +117,20 @@ const ProjectDetail: React.FC = () => {
             </svg>
           </button>
           <h1 className="text-xl font-semibold">{project.name}</h1>
-          <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded-full">
-            {project.type === 'classification' ? 'Classification' : 'Object Detection'}
-          </span>
-        </div>
-        <div className="flex space-x-2">
-          <button className="bg-white border border-gray-300 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-50">
-            Settings
-          </button>
-          <button className="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">
-            Export
-          </button>
-        </div>
-      </div>
-
-      {/* Project Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
-        <div className="bg-white p-4 rounded shadow">
-          <h3 className="text-sm font-medium text-gray-500">Images</h3>
-          <p className="text-2xl font-semibold">{project.resources || 0}</p>
-        </div>
-        <div className="bg-white p-4 rounded shadow">
-          <h3 className="text-sm font-medium text-gray-500">Annotations</h3>
-          <p className="text-2xl font-semibold">0</p>
-        </div>
-        <div className="bg-white p-4 rounded shadow">
-          <h3 className="text-sm font-medium text-gray-500">Models</h3>
-          <p className="text-2xl font-semibold">0</p>
+          <div className="flex space-x-2">
+            <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded-full">
+              {project.type === 'classification' ? 'Classification' : 'Object Detection'}
+            </span>
+            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+              {project.resources || 0} Images
+            </span>
+            <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">
+              0 Annotations
+            </span>
+            <span className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
+              0 Models
+            </span>
+          </div>
         </div>
       </div>
 
@@ -140,10 +138,16 @@ const ProjectDetail: React.FC = () => {
       <div className="bg-white shadow-sm border-b">
         <div className="flex">
           <button 
-            className={`px-4 py-2 text-sm font-medium ${activeTab === 'data' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('data')}
+            className={`px-4 py-2 text-sm font-medium ${activeTab === 'upload' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setActiveTab('upload')}
           >
-            Data
+            Upload
+          </button>
+          <button 
+            className={`px-4 py-2 text-sm font-medium ${activeTab === 'dataset' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setActiveTab('dataset')}
+          >
+            Dataset
           </button>
           <button 
             className={`px-4 py-2 text-sm font-medium ${activeTab === 'annotate' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
@@ -168,22 +172,26 @@ const ProjectDetail: React.FC = () => {
 
       {/* Tab Content */}
       <div className="flex-grow p-4 bg-gray-50 overflow-auto">
-        {activeTab === 'data' && (
+        {activeTab === 'upload' && (
           <div>
             <div className="bg-white p-6 rounded shadow">
-              <h2 className="text-lg font-medium mb-4">Upload Data</h2>
+              <h2 className="text-lg font-medium mb-4">Upload Images</h2>
               <p className="text-gray-600 mb-4">
                 Upload images to your project. Supported formats: JPG, PNG.
               </p>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <p className="mt-2 text-sm text-gray-600">Drag and drop files here, or click to select files</p>
-                <button className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700">
-                  Select Files
-                </button>
-              </div>
+              {projectUuid && <FileUpload projectUuid={projectUuid} onUploadSuccess={handleUploadSuccess} />}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'dataset' && (
+          <div>
+            <div className="bg-white p-6 rounded shadow">
+              <h2 className="text-lg font-medium mb-4">Project Dataset</h2>
+              <p className="text-gray-600 mb-4">
+                View and manage all images in your project.
+              </p>
+              {projectUuid && <ImageGallery projectUuid={projectUuid} />}
             </div>
           </div>
         )}
