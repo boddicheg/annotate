@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated } = useAuth();
+  const { register, isAuthenticated, error: authError, loading: authLoading } = useAuth();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,15 +19,19 @@ const Register: React.FC = () => {
     }
   }, [isAuthenticated, navigate]);
 
+  // Update error message from auth context
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
       // Simple validation
       if (!username || !email || !password || !confirmPassword) {
         throw new Error("Please fill in all fields");
@@ -41,18 +45,13 @@ const Register: React.FC = () => {
         throw new Error("Password must be at least 6 characters");
       }
       
-      // In a real app, you'd register the user with the server
+      // Register using the auth context
+      await register(username, email, password);
       
-      // Login the user
-      login({ username, email });
-      
-      // Redirect to projects page
-      navigate("/projects");
+      // Redirect to projects page (handled by the first useEffect)
     } catch (err) {
-      if (err instanceof Error) {
+      if (err instanceof Error && !authError) {
         setError(err.message);
-      } else {
-        setError("An unexpected error occurred");
       }
     } finally {
       setIsLoading(false);
@@ -154,12 +153,12 @@ const Register: React.FC = () => {
           <div>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || authLoading}
               className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
-                isLoading ? "bg-indigo-400" : "bg-indigo-600 hover:bg-indigo-700"
+                isLoading || authLoading ? "bg-indigo-400" : "bg-indigo-600 hover:bg-indigo-700"
               } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
             >
-              {isLoading ? (
+              {isLoading || authLoading ? (
                 <span className="absolute left-0 inset-y-0 flex items-center pl-3">
                   <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -173,7 +172,7 @@ const Register: React.FC = () => {
                   </svg>
                 </span>
               )}
-              {isLoading ? "Creating account..." : "Create account"}
+              {isLoading || authLoading ? "Creating account..." : "Create account"}
             </button>
           </div>
         </form>

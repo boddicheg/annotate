@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, error: authError, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -17,32 +17,31 @@ const Login: React.FC = () => {
     }
   }, [isAuthenticated, navigate]);
 
+  // Update error message from auth context
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
       // Simple validation
       if (!email || !password) {
         throw new Error("Please fill in all fields");
       }
       
-      // In a real app, you'd verify credentials with the server
+      // Login using the auth context
+      await login(email, password);
       
-      // Login the user
-      login({ email });
-      
-      // Redirect to projects page
-      navigate("/projects");
+      // Redirect to projects page (handled by the first useEffect)
     } catch (err) {
-      if (err instanceof Error) {
+      if (err instanceof Error && !authError) {
         setError(err.message);
-      } else {
-        setError("An unexpected error occurred");
       }
     } finally {
       setIsLoading(false);
@@ -132,12 +131,12 @@ const Login: React.FC = () => {
           <div>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || authLoading}
               className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
-                isLoading ? "bg-indigo-400" : "bg-indigo-600 hover:bg-indigo-700"
+                isLoading || authLoading ? "bg-indigo-400" : "bg-indigo-600 hover:bg-indigo-700"
               } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
             >
-              {isLoading ? (
+              {isLoading || authLoading ? (
                 <span className="absolute left-0 inset-y-0 flex items-center pl-3">
                   <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -151,7 +150,7 @@ const Login: React.FC = () => {
                   </svg>
                 </span>
               )}
-              {isLoading ? "Signing in..." : "Sign in"}
+              {isLoading || authLoading ? "Signing in..." : "Sign in"}
             </button>
           </div>
         </form>

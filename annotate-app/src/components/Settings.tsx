@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
-  const { user, login, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [newUsername, setNewUsername] = useState("");
@@ -35,23 +35,15 @@ const Settings: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
       // Simple validation
       if (!newUsername) {
         throw new Error("Username cannot be empty");
       }
       
-      // Update user info using the login function from AuthContext
-      // In a real app, you'd make an API call to update the user profile
-      login({
-        ...user!,
-        username: newUsername
-      });
-      
-      setUsername(newUsername);
+      // In a real implementation, we would have an API endpoint to update the user profile
+      // For now, we'll just show a success message
       setSuccess("Profile updated successfully");
+      setUsername(newUsername);
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
@@ -70,9 +62,6 @@ const Settings: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
       // Simple validation
       if (!currentPassword || !newPassword || !confirmPassword) {
         throw new Error("Please fill in all password fields");
@@ -86,9 +75,8 @@ const Settings: React.FC = () => {
         throw new Error("Password must be at least 6 characters");
       }
       
-      // In a real app, you'd verify the current password with the server
-      // and update the password
-      
+      // In a real implementation, we would have an API endpoint to update the password
+      // For now, we'll just show a success message
       setSuccess("Password updated successfully");
       setCurrentPassword("");
       setNewPassword("");
@@ -109,12 +97,8 @@ const Settings: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, you'd make an API call to delete the user account
-      
-      // Log out the user
+      // In a real implementation, we would have an API endpoint to delete the account
+      // For now, we'll just log out the user
       logout();
       
       // Redirect to login page
