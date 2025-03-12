@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { fetchProjects, ProjectsInterface } from "../services/Api";
+import { useNavigate } from "react-router-dom";
 import moment from 'moment';
+import { useAuth } from "../context/AuthContext";
 // import AddProjectModal from './AddProjectModal';
 
 export const ProjectsList = ({
@@ -65,19 +67,44 @@ const Projects: React.FC = () => {
   const [projects, setProjects] = useState<Array<ProjectsInterface>>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [fetchAttempted, setFetchAttempted] = useState<boolean>(false);
+  const navigate = useNavigate();
+  const { isAuthenticated, loading: authLoading } = useAuth();
 
   const getProjects = async () => {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+    
     try {
+      // Debug token before fetching projects
+      const token = localStorage.getItem('token');
+      console.log('Token when fetching projects:', token);
+      
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+      
       const data = await fetchProjects();
       setProjects(data);
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
+        console.error('Project fetch error:', err.message);
+        
+        // Check if the error is due to authentication
+        if (err.message.includes("Authentication") || err.message.includes("token")) {
+          // Redirect to login page
+          navigate("/login");
+        }
       } else {
         setError("An unexpected error occurred");
       }
     } finally {
       setLoading(false);
+      setFetchAttempted(true);
     }
   };
 
@@ -87,10 +114,15 @@ const Projects: React.FC = () => {
   // };
 
   useEffect(() => {
-    getProjects();
-  }, []);
+    // Only fetch projects if authenticated and not already loading
+    if (isAuthenticated && !authLoading && !fetchAttempted) {
+      getProjects();
+    } else if (!isAuthenticated && !authLoading) {
+      navigate("/login");
+    }
+  }, [isAuthenticated, authLoading, fetchAttempted, navigate]);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>

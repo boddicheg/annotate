@@ -31,8 +31,11 @@ def token_required(f):
         token = None
         auth_header = request.headers.get('Authorization')
         
+        print(f"Auth header: {auth_header}")
+        
         if auth_header and auth_header.startswith('Bearer '):
             token = auth_header.split(' ')[1]
+            print(f"Extracted token: {token[:20]}...")
             
         if not token:
             return jsonify({"error": "Authentication token is missing"}), 401

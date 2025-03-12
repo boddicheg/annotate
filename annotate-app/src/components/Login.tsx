@@ -9,13 +9,25 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated, but only if not in the process of logging in
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isLoading && !loginSuccess) {
       navigate("/projects");
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, isLoading, loginSuccess]);
+
+  // After successful login, wait a moment before redirecting
+  useEffect(() => {
+    if (loginSuccess) {
+      const timer = setTimeout(() => {
+        navigate("/projects");
+      }, 500); // Short delay to ensure token is properly set
+      
+      return () => clearTimeout(timer);
+    }
+  }, [loginSuccess, navigate]);
 
   // Update error message from auth context
   useEffect(() => {
@@ -29,20 +41,25 @@ const Login: React.FC = () => {
     setError("");
     setIsLoading(true);
 
+    if (!email || !password) {
+      setError("Please enter both email and password");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      // Simple validation
-      if (!email || !password) {
-        throw new Error("Please fill in all fields");
-      }
-      
-      // Login using the auth context
       await login(email, password);
       
-      // Redirect to projects page (handled by the first useEffect)
+      // Debug token after login
+      const token = localStorage.getItem('token');
+      console.log('Token after login:', token);
+      
+      // Mark login as successful but don't navigate immediately
+      setLoginSuccess(true);
     } catch (err) {
-      if (err instanceof Error && !authError) {
-        setError(err.message);
-      }
+      // Error is handled by the AuthContext
+      console.error('Login error:', err);
+      setLoginSuccess(false);
     } finally {
       setIsLoading(false);
     }

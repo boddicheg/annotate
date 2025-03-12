@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { sendAddNewProject } from "../services/Api";
+import { useAuth } from "../context/AuthContext";
 
 const CreateProject: React.FC = () => {
   const navigate = useNavigate();
@@ -8,24 +9,61 @@ const CreateProject: React.FC = () => {
   const [name, setName] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [projectType, setProjectType] = useState<string>('object-detection');
+  const { isAuthenticated, loading: authLoading } = useAuth();
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated && !authLoading) {
+      navigate("/login");
+    }
+  }, [isAuthenticated, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
     const data = { name, description, type: projectType };
 
     try {
+      // Debug token before creating project
+      const token = localStorage.getItem('token');
+      console.log('Token when creating project:', token);
+      
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+      
       await sendAddNewProject(data);
       navigate('/projects');
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
+        console.error('Project creation error:', err.message);
+        
+        // Check if the error is due to authentication
+        if (err.message.includes("Authentication") || err.message.includes("token")) {
+          // Redirect to login page
+          navigate("/login");
+        }
       } else {
         setError("An unexpected error occurred");
       }
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">

@@ -63,8 +63,16 @@ class AuthController:
     def get_current_user(self, token):
         try:
             # Decode token
-            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-            user_id = payload['sub']
+            print(f"Token: {token}")
+            # Add options to handle the datetime format
+            payload = jwt.decode(
+                token, 
+                SECRET_KEY, 
+                algorithms=['HS256'],
+                options={"verify_signature": True}
+            )
+            user_id = int(payload['sub'])  # Convert string ID back to integer
+            print(f"User ID: {user_id}")
             
             # Get user
             user = self.database.get_user_by_id(user_id)
@@ -75,14 +83,22 @@ class AuthController:
             return {"user": user}, 200
             
         except jwt.ExpiredSignatureError:
+            print("Token expired")
             return {"error": "Token expired"}, 401
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as e:
+            print(f"Invalid token error: {str(e)}")
             return {"error": "Invalid token"}, 401
+        except ValueError as e:
+            print(f"Value error: {str(e)}")
+            return {"error": "Invalid token format"}, 401
     
     def _generate_token(self, user):
+        now = datetime.datetime.now(datetime.UTC)
         payload = {
-            'sub': user['id'],
-            'iat': datetime.datetime.utcnow(),
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=1)
+            'sub': str(user['id']),  # Convert ID to string to ensure compatibility
+            'iat': int(now.timestamp()),  # Convert to integer timestamp
+            'exp': int((now + datetime.timedelta(days=1)).timestamp())  # Convert to integer timestamp
         }
-        return jwt.encode(payload, SECRET_KEY, algorithm='HS256') 
+        token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+        print(f"Generated token: {token[:20]}...")
+        return token 
