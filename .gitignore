@@ -10,3 +10,4 @@ package-lock.json
 *.pyc
 *.sqlite*
 node_modules/*
+backend/uploads/*
