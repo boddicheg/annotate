@@ -14,9 +14,11 @@ interface ImageData {
 
 interface ImageGalleryProps {
   projectUuid: string;
+  onImageSelect?: (imageUrl: string) => void;
+  selectable?: boolean;
 }
 
-const ImageGallery: React.FC<ImageGalleryProps> = ({ projectUuid }) => {
+const ImageGallery: React.FC<ImageGalleryProps> = ({ projectUuid, onImageSelect, selectable = false }) => {
   const [images, setImages] = useState<ImageData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -153,6 +155,13 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ projectUuid }) => {
     }
   };
 
+  const handleImageClick = (image: ImageData, e: React.MouseEvent) => {
+    if (selectable && onImageSelect) {
+      e.stopPropagation();
+      onImageSelect(getSecureImageUrl(image.file_path));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -193,7 +202,10 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ projectUuid }) => {
         {images.map((image) => (
           <div 
             key={image.uuid} 
-            className="bg-white rounded-lg shadow overflow-hidden relative group"
+            className={`bg-white rounded-lg shadow overflow-hidden relative group ${
+              selectable ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''
+            }`}
+            onClick={(e) => handleImageClick(image, e)}
           >
             <div className="h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
               <img 

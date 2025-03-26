@@ -4,6 +4,7 @@ import { fetchProjectById, ProjectsInterface } from "../services/Api";
 import { useAuth } from "../context/AuthContext";
 import FileUpload from './FileUpload';
 import ImageGallery from './ImageGallery';
+import AnnotationCanvas from './AnnotationCanvas';
 // import moment from 'moment';
 
 const ProjectDetail: React.FC = () => {
@@ -15,6 +16,8 @@ const ProjectDetail: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("upload");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [annotations, setAnnotations] = useState<any[]>([]);
 
   const fetchProjectData = async () => {
     if (!projectUuid) {
@@ -59,6 +62,12 @@ const ProjectDetail: React.FC = () => {
   const handleUploadSuccess = () => {
     // Refresh project data to update resources count
     fetchProjectData();
+  };
+
+  const handleAnnotationComplete = (newAnnotations: any[]) => {
+    setAnnotations(newAnnotations);
+    // Here you would typically save the annotations to your backend
+    console.log('Annotations updated:', newAnnotations);
   };
 
   if (loading) {
@@ -199,26 +208,36 @@ const ProjectDetail: React.FC = () => {
         {activeTab === 'annotate' && (
           <div>
             <div className="bg-white p-6 rounded shadow">
-              <h2 className="text-lg font-medium mb-4">Annotation Tools</h2>
-              <p className="text-gray-600 mb-4">
-                Start annotating your images to train your model.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="border border-gray-200 rounded p-4">
-                  <h3 className="font-medium">Manual Annotation</h3>
-                  <p className="text-sm text-gray-600 mt-2">Annotate images yourself using our annotation tools.</p>
-                  <button className="mt-4 bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">
-                    Start Annotating
-                  </button>
+              {!selectedImage ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="border border-gray-200 rounded p-4">
+                    <h3 className="font-medium">Select Image to Annotate</h3>
+                    <div className="mt-4">
+                      <ImageGallery 
+                        projectUuid={projectUuid || ''} 
+                        onImageSelect={(imageUrl) => setSelectedImage(imageUrl)}
+                        selectable={true}
+                      />
+                    </div>
+                  </div>
+                  <div className="border border-gray-200 rounded p-4">
+                    <h3 className="font-medium">Auto Annotation</h3>
+                    <p className="text-sm text-gray-600 mt-2">Use AI to automatically annotate your images.</p>
+                    <button className="mt-4 bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-300">
+                      Coming Soon
+                    </button>
+                  </div>
                 </div>
-                <div className="border border-gray-200 rounded p-4">
-                  <h3 className="font-medium">Auto Annotation</h3>
-                  <p className="text-sm text-gray-600 mt-2">Use AI to automatically annotate your images.</p>
-                  <button className="mt-4 bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-300">
-                    Coming Soon
-                  </button>
+              ) : (
+                <div>
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <AnnotationCanvas
+                      imageUrl={selectedImage}
+                      onAnnotationComplete={handleAnnotationComplete}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}
