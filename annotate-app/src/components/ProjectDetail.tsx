@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { fetchProjectById, ProjectsInterface } from "../services/Api";
+import { fetchProjectById, ProjectsInterface, ImageData } from "../services/Api";
 import { useAuth } from "../context/AuthContext";
 import FileUpload from './FileUpload';
 import ImageGallery from './ImageGallery';
@@ -16,8 +16,8 @@ const ProjectDetail: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("upload");
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [annotations, setAnnotations] = useState<any[]>([]);
+  const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
+  const [images, setImages] = useState<ImageData[]>([]);
 
   const fetchProjectData = async () => {
     if (!projectUuid) {
@@ -28,12 +28,19 @@ const ProjectDetail: React.FC = () => {
 
     try {
       const projectData = await fetchProjectById(projectUuid);
+      console.log('Fetched project data:', projectData); // Debug log
       setProject(projectData);
+      if (projectData.images) {
+        console.log('Setting images:', projectData.images); // Debug log
+        setImages(projectData.images);
+      } else {
+        console.log('No images in project data'); // Debug log
+        setImages([]);
+      }
       setLoading(false);
     } catch (err: any) {
       console.error('Error fetching project:', err);
       
-      // Check if it's an authentication error
       if (err.message && (err.message.includes('Authentication') || err.message.includes('token'))) {
         navigate('/login');
       } else if (err.message && err.message.includes('not found')) {
@@ -59,15 +66,21 @@ const ProjectDetail: React.FC = () => {
     getProject();
   }, [projectUuid, navigate, isAuthenticated]);
 
+  // Add debug effect for images state
+  useEffect(() => {
+    console.log('Current images state:', images);
+  }, [images]);
+
   const handleUploadSuccess = () => {
     // Refresh project data to update resources count
     fetchProjectData();
   };
 
-  const handleAnnotationComplete = (newAnnotations: any[]) => {
-    setAnnotations(newAnnotations);
-    // Here you would typically save the annotations to your backend
-    console.log('Annotations updated:', newAnnotations);
+  const getSecureImageUrl = (filePath: string) => {
+    const token = localStorage.getItem('token');
+    // Remove 'uploads/' from the file path if it exists
+    const cleanPath = filePath.replace('uploads/', '');
+    return `/api/images/${cleanPath}?token=${token}`;
   };
 
   if (loading) {
@@ -206,34 +219,62 @@ const ProjectDetail: React.FC = () => {
         )}
 
         {activeTab === 'annotate' && (
-          <div>
-            <div className="bg-white p-6 rounded shadow">
+          <div className="p-6">
+            <div className="bg-white rounded-lg shadow">
               {!selectedImage ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="border border-gray-200 rounded p-4">
-                    <h3 className="font-medium">Select Image to Annotate</h3>
-                    <div className="mt-4">
-                      <ImageGallery 
-                        projectUuid={projectUuid || ''} 
-                        onImageSelect={(imageUrl) => setSelectedImage(imageUrl)}
-                        selectable={true}
-                      />
+                <div className="p-6">
+                  <h2 className="text-xl font-semibold mb-4">Select Image to Annotate</h2>
+                  {images.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">No images available. Please upload some images first.</p>
+                      <button
+                        onClick={() => setActiveTab('upload')}
+                        className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      >
+                        Go to Upload
+                      </button>
                     </div>
-                  </div>
-                  <div className="border border-gray-200 rounded p-4">
-                    <h3 className="font-medium">Auto Annotation</h3>
-                    <p className="text-sm text-gray-600 mt-2">Use AI to automatically annotate your images.</p>
-                    <button className="mt-4 bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-300">
-                      Coming Soon
-                    </button>
-                  </div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {images.map((image) => (
+                        <div
+                          key={image.uuid}
+                          className="relative cursor-pointer rounded-lg overflow-hidden border hover:border-blue-500"
+                          onClick={() => setSelectedImage(image)}
+                        >
+                          <img
+                            src={getSecureImageUrl(image.file_path)}
+                            alt={image.original_filename}
+                            className="w-full h-48 object-cover"
+                          />
+                          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2 text-sm truncate">
+                            {image.original_filename}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div>
+                <div className="p-6">
+                  <div className="mb-4 flex justify-between items-center">
+                    <h2 className="text-xl font-semibold">Annotate Image: {selectedImage.original_filename}</h2>
+                    <button
+                      onClick={() => setSelectedImage(null)}
+                      className="px-3 py-1 text-gray-600 hover:text-gray-800 flex items-center gap-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                      </svg>
+                      Back to Gallery
+                    </button>
+                  </div>
+
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <AnnotationCanvas
-                      imageUrl={selectedImage}
-                      onAnnotationComplete={handleAnnotationComplete}
+                      projectUuid={project.uuid}
+                      imageUuid={selectedImage.uuid}
+                      imageUrl={getSecureImageUrl(selectedImage.file_path)}
                     />
                   </div>
                 </div>

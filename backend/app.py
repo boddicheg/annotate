@@ -262,5 +262,70 @@ def get_image_data(filename):
     # Return the file with appropriate content type
     return send_from_directory(os.path.join(root, 'uploads'), filename)
 
+# Label routes
+@app.route('/api/projects/<string:project_uuid>/labels', methods=['GET'])
+@token_required
+def get_project_labels(project_uuid):
+    labels, error = g_projects.get_project_labels(project_uuid)
+    if error:
+        return jsonify({"error": error}), 404
+    return jsonify(labels), 200
+
+@app.route('/api/projects/<string:project_uuid>/labels', methods=['POST'])
+@token_required
+def add_project_label(project_uuid):
+    data = request.get_json()
+    if not data or 'name' not in data:
+        return jsonify({"error": "Label name is required"}), 400
+        
+    label, error = g_projects.add_label(project_uuid, data['name'])
+    if error:
+        return jsonify({"error": error}), 404
+    return jsonify(label), 201
+
+@app.route('/api/projects/<string:project_uuid>/labels/<int:label_id>', methods=['DELETE'])
+@token_required
+def delete_project_label(project_uuid, label_id):
+    success, error = g_projects.delete_label(project_uuid, label_id)
+    if error:
+        return jsonify({"error": error}), 404
+    return jsonify({"message": "Label deleted successfully"}), 200
+
+# Annotation routes
+@app.route('/api/images/<string:image_uuid>/annotations', methods=['GET'])
+@token_required
+def get_image_annotations(image_uuid):
+    annotations, error = g_projects.get_image_annotations(image_uuid)
+    if error:
+        return jsonify({"error": error}), 404
+    return jsonify(annotations), 200
+
+@app.route('/api/images/<string:image_uuid>/annotations', methods=['POST'])
+@token_required
+def add_image_annotation(image_uuid):
+    data = request.get_json()
+    if not data or not all(k in data for k in ['label_id', 'x', 'y', 'width', 'height']):
+        return jsonify({"error": "Missing required fields"}), 400
+        
+    annotation, error = g_projects.add_annotation(
+        image_uuid,
+        data['label_id'],
+        data['x'],
+        data['y'],
+        data['width'],
+        data['height']
+    )
+    if error:
+        return jsonify({"error": error}), 404
+    return jsonify(annotation), 201
+
+@app.route('/api/images/<string:image_uuid>/annotations/<int:annotation_id>', methods=['DELETE'])
+@token_required
+def delete_image_annotation(image_uuid, annotation_id):
+    success, error = g_projects.delete_annotation(image_uuid, annotation_id)
+    if error:
+        return jsonify({"error": error}), 404
+    return jsonify({"message": "Annotation deleted successfully"}), 200
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=1337)

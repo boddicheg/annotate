@@ -1,3 +1,22 @@
+const API_URL = 'http://localhost:1337';
+
+export interface ImageData {
+  id: number;
+  uuid: string;
+  original_filename: string;
+  file_path: string;
+  file_size: number;
+  upload_date: string;
+  project_id: number;
+  user_id: number;
+}
+
+export interface Label {
+  id: number;
+  name: string;
+  project_id: number;
+}
+
 export interface ProjectsInterface {
   id: number;
   uuid: string;
@@ -6,6 +25,7 @@ export interface ProjectsInterface {
   resources: number;
   date_updated: string;
   type?: string;
+  images?: ImageData[];
 }
 
 export const fetchProjects = async (): Promise<Array<ProjectsInterface>> => {
@@ -121,4 +141,26 @@ export const deleteProject = async (projectUuid: string): Promise<ApiResponse> =
   }
 
   return await response.json();
+};
+
+export const createProjectLabel = async (projectUuid: string, name: string): Promise<Label> => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error("Authentication token is missing");
+  }
+
+  const response = await fetch(`${API_URL}/api/projects/${projectUuid}/labels`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to create label");
+  }
+
+  return response.json();
 };

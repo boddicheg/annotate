@@ -111,3 +111,27 @@ class ProjectsController():
             return True, "Image deleted successfully"
         else:
             return False, "Failed to delete image from database"
+
+    def get_project_labels(self, project_uuid):
+        """Get all labels for a project"""
+        return self.database.get_project_labels(project_uuid)
+
+    def add_label(self, project_uuid, name):
+        """Add a new label to a project"""
+        return self.database.add_label(project_uuid, name)
+
+    def delete_label(self, project_uuid, label_id):
+        """Delete a label from a project"""
+        return self.database.delete_label(project_uuid, label_id)
+
+    def get_image_annotations(self, image_uuid):
+        """Get all annotations for an image"""
+        return self.database.get_image_annotations(image_uuid)
+
+    def add_annotation(self, image_uuid, label_id, x, y, width, height):
+        """Add a new annotation to an image"""
+        return self.database.add_annotation(image_uuid, label_id, x, y, width, height)
+
+    def delete_annotation(self, image_uuid, annotation_id):
+        """Delete an annotation from an image"""
+        return self.database.delete_annotation(image_uuid, annotation_id)

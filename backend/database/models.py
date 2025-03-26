@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Boolean, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Boolean, DateTime, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -64,6 +64,32 @@ class ProjectImage(Base):
     # Add user relationship
     user_id = Column(Integer, ForeignKey('users.id'))
     user = relationship("User")
+    # Add relationship to annotations
+    annotations = relationship("Annotation", back_populates="image", cascade="all, delete-orphan")
+
+class Label(Base):
+    __tablename__ = 'labels'
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    project_id = Column(Integer, ForeignKey('projects.id'))
+    project = relationship("Projects", backref="labels")
+    created_at = Column(String, default=lambda: str(datetime.datetime.now()))
+    # Add relationship to annotations
+    annotations = relationship("Annotation", back_populates="label", cascade="all, delete-orphan")
+
+class Annotation(Base):
+    __tablename__ = 'annotations'
+    id = Column(Integer, primary_key=True)
+    x = Column(Float, nullable=False)
+    y = Column(Float, nullable=False)
+    width = Column(Float, nullable=False)
+    height = Column(Float, nullable=False)
+    created_at = Column(String, default=lambda: str(datetime.datetime.now()))
+    # Add relationships
+    image_id = Column(Integer, ForeignKey('project_images.id'))
+    image = relationship("ProjectImage", back_populates="annotations")
+    label_id = Column(Integer, ForeignKey('labels.id'))
+    label = relationship("Label", back_populates="annotations")
 
 # -----------------------------------------------------------------------------
     
@@ -192,6 +218,20 @@ class DBSession:
         if not project:
             return None
             
+        # Convert project images to dict
+        images = []
+        for image in project.images:
+            images.append({
+                "id": image.id,
+                "uuid": image.uuid,
+                "original_filename": image.original_filename,
+                "file_path": image.file_path,
+                "file_size": image.file_size,
+                "upload_date": image.upload_date,
+                "project_id": image.project_id,
+                "user_id": image.user_id
+            })
+            
         return {
             "id": project.id,
             "uuid": project.uuid,
@@ -200,7 +240,8 @@ class DBSession:
             "resources": project.resources,
             "date_updated": project.date_updated,
             "type": project.type if hasattr(project, 'type') else "object-detection",
-            "user_id": project.user_id
+            "user_id": project.user_id,
+            "images": images
         }
         
     def delete_project_by_uuid(self, project_uuid, user_id=None):
@@ -340,18 +381,147 @@ class DBSession:
         
     def update_project_resources_count(self, project_uuid):
         # Get project by UUID
-        project = self.session.query(Projects).filter_by(uuid=project_uuid).first()
-        
+        project = self.session.query(Projects).filter(Projects.uuid == project_uuid).first()
+        if project:
+            project.resources = len(project.images)
+            project.date_updated = str(datetime.datetime.now())
+            self.session.commit()
+            return True
+        return False
+
+    # Label methods
+    def add_label(self, project_uuid, name, user_id=None):
+        # Get project by UUID
+        project = self.session.query(Projects).filter(Projects.uuid == project_uuid).first()
         if not project:
-            return False
+            return None, "Project not found"
             
-        # Count images for the project
-        count = self.session.query(ProjectImage).filter_by(project_id=project.id).count()
+        # Check if label already exists in project
+        existing_label = self.session.query(Label).filter(
+            Label.project_id == project.id,
+            Label.name == name
+        ).first()
         
-        # Update project resources count
-        project.resources = count
-        project.date_updated = str(datetime.datetime.now())
-        
+        if existing_label:
+            return None, "Label already exists in this project"
+            
+        # Create new label
+        label = Label(name=name, project_id=project.id)
+        self.session.add(label)
         self.session.commit()
-        return True
+        
+        return {
+            "id": label.id,
+            "name": label.name,
+            "created_at": label.created_at
+        }, None
+        
+    def get_project_labels(self, project_uuid, user_id=None):
+        # Get project by UUID
+        project = self.session.query(Projects).filter(Projects.uuid == project_uuid).first()
+        if not project:
+            return None, "Project not found"
+            
+        labels = self.session.query(Label).filter(Label.project_id == project.id).all()
+        return [{
+            "id": label.id,
+            "name": label.name,
+            "created_at": label.created_at
+        } for label in labels], None
+        
+    def delete_label(self, project_uuid, label_id, user_id=None):
+        # Get project by UUID
+        project = self.session.query(Projects).filter(Projects.uuid == project_uuid).first()
+        if not project:
+            return False, "Project not found"
+            
+        # Get label
+        label = self.session.query(Label).filter(
+            Label.id == label_id,
+            Label.project_id == project.id
+        ).first()
+        
+        if not label:
+            return False, "Label not found"
+            
+        self.session.delete(label)
+        self.session.commit()
+        return True, None
+
+    # Annotation methods
+    def add_annotation(self, image_uuid, label_id, x, y, width, height, user_id=None):
+        # Get image by UUID
+        image = self.session.query(ProjectImage).filter(ProjectImage.uuid == image_uuid).first()
+        if not image:
+            return None, "Image not found"
+            
+        # Get label
+        label = self.session.query(Label).filter(Label.id == label_id).first()
+        if not label:
+            return None, "Label not found"
+            
+        # Create new annotation
+        annotation = Annotation(
+            image_id=image.id,
+            label_id=label_id,
+            x=x,
+            y=y,
+            width=width,
+            height=height
+        )
+        self.session.add(annotation)
+        self.session.commit()
+        
+        return {
+            "id": annotation.id,
+            "x": annotation.x,
+            "y": annotation.y,
+            "width": annotation.width,
+            "height": annotation.height,
+            "label": {
+                "id": label.id,
+                "name": label.name
+            },
+            "created_at": annotation.created_at
+        }, None
+        
+    def get_image_annotations(self, image_uuid, user_id=None):
+        # Get image by UUID
+        image = self.session.query(ProjectImage).filter(ProjectImage.uuid == image_uuid).first()
+        if not image:
+            return None, "Image not found"
+            
+        annotations = self.session.query(Annotation).filter(Annotation.image_id == image.id).all()
+        return [{
+            "id": annotation.id,
+            "x": annotation.x,
+            "y": annotation.y,
+            "width": annotation.width,
+            "height": annotation.height,
+            "label": {
+                "id": annotation.label.id,
+                "name": annotation.label.name
+            },
+            "created_at": annotation.created_at
+        } for annotation in annotations], None
+        
+    def delete_annotation(self, image_uuid, annotation_id, user_id=None):
+        # Get image by UUID
+        image = self.session.query(ProjectImage).filter(ProjectImage.uuid == image_uuid).first()
+        if not image:
+            return False, "Image not found"
+            
+        # Get annotation
+        annotation = self.session.query(Annotation).filter(
+            Annotation.id == annotation_id,
+            Annotation.image_id == image.id
+        ).first()
+        
+        if not annotation:
+            return False, "Annotation not found"
+            
+        self.session.delete(annotation)
+        self.session.commit()
+        return True, None
+
 # -----------------------------------------------------------------------------

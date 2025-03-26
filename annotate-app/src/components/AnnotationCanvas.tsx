@@ -1,4 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { useToast } from '../context/ToastContext';
 
 interface Rectangle {
   x1: number;
@@ -6,14 +7,27 @@ interface Rectangle {
   x2: number;
   y2: number;
   label: string;
+  id: number;
 }
 
 interface AnnotationCanvasProps {
+  projectUuid: string;
+  imageUuid: string;
   imageUrl: string;
-  onAnnotationComplete: (annotations: Rectangle[]) => void;
 }
 
-const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotationComplete }) => {
+// Add Label interface
+interface Label {
+  id: number;
+  name: string;
+}
+
+const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ 
+  projectUuid, 
+  imageUuid, 
+  imageUrl 
+}) => {
+  const { showToast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
@@ -21,11 +35,114 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
   const [annotations, setAnnotations] = useState<Rectangle[]>([]);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [scale, setScale] = useState<number>(1);
-  const [labels, setLabels] = useState<string[]>([]);
-  const [newLabel, setNewLabel] = useState('');
+  const [imageWidth, setImageWidth] = useState<number>(0);
+  const [imageHeight, setImageHeight] = useState<number>(0);
+  const [labels, setLabels] = useState<Label[]>([]);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [selectedAnnotationIndex, setSelectedAnnotationIndex] = useState<number | null>(null);
   const [hoveredAnnotationIndex, setHoveredAnnotationIndex] = useState<number | null>(null);
+
+  // Fetch project labels when component mounts
+  useEffect(() => {
+    const fetchLabels = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/projects/${projectUuid}/labels`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setLabels(data);  // Store the full label objects
+        }
+      } catch (error) {
+        console.error('Error fetching labels:', error);
+      }
+    };
+
+    fetchLabels();
+  }, [projectUuid]);
+
+  // Fetch existing annotations when component mounts
+  useEffect(() => {
+    const fetchAnnotations = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/images/${imageUuid}/annotations`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setAnnotations(data.map((annotation: any) => ({
+            id: annotation.id,
+            x1: annotation.x,
+            y1: annotation.y,
+            x2: annotation.x + annotation.width,
+            y2: annotation.y + annotation.height,
+            label: annotation.label.name
+          })));
+        }
+      } catch (error) {
+        console.error('Error fetching annotations:', error);
+      }
+    };
+
+    if (imageWidth && imageHeight) {
+      fetchAnnotations();
+    }
+  }, [imageUuid, imageWidth, imageHeight]);
+
+  // Save annotation to backend
+  const saveAnnotation = async (annotation: Rectangle) => {
+    try {
+      const token = localStorage.getItem('token');
+      const labelId = labels.find(l => l.name === annotation.label)?.id || 0; // Assuming label IDs start from 1
+      
+      const response = await fetch(`/api/images/${imageUuid}/annotations`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          label_id: labelId,
+          x: annotation.x1,
+          y: annotation.y1,
+          width: annotation.x2 - annotation.x1,
+          height: annotation.y2 - annotation.y1,
+          coordinate_format: 'uv' // Indicate that we're sending UV coordinates
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save annotation');
+      }
+    } catch (error) {
+      console.error('Error saving annotation:', error);
+    }
+  };
+
+  // Delete annotation from backend
+  const deleteAnnotationFromBackend = async (annotation: Rectangle) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/images/${imageUuid}/annotations/${annotation.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete annotation');
+      }
+    } catch (error) {
+      console.error('Error deleting annotation:', error);
+    }
+  };
 
   // Load image and calculate scale
   useEffect(() => {
@@ -33,13 +150,17 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
     img.src = imageUrl;
     img.onload = () => {
       setImage(img);
-      // Calculate scale to fit window
+      setImageWidth(img.width);
+      setImageHeight(img.height);
+      
       if (canvasRef.current) {
-        const windowWidth = window.innerWidth * 0.7; // 70% of window width
-        const windowHeight = window.innerHeight * 0.8; // 80% of window height
-        const scaleX = windowWidth / img.width;
-        const scaleY = windowHeight / img.height;
-        const newScale = Math.min(scaleX, scaleY);
+        const targetWidth = 800;
+        let newScale = 1;
+        
+        // Only scale down if image is wider than target width
+        if (img.width > targetWidth) {
+          newScale = targetWidth / img.width;
+        }
         
         setScale(newScale);
         
@@ -50,141 +171,213 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
         // Draw image
         const ctx = canvasRef.current.getContext('2d');
         if (ctx) {
-          ctx.drawImage(img, 0, 0, canvasRef.current.width, canvasRef.current.height);
+          ctx.drawImage(img, 0, 0, img.width * newScale, img.height * newScale);
         }
       }
     };
   }, [imageUrl]);
 
-  // Draw annotations
-  useEffect(() => {
-    if (!canvasRef.current || !image) return;
+  const getMousePos = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current) return null;
+    const rect = canvasRef.current.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) / (imageWidth * scale),
+      y: (e.clientY - rect.top) / (imageHeight * scale)
+    };
+  };
 
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!selectedLabel) {
+      showToast('Please select a label first', 'error');
+      return;
+    }
+
+    const pos = getMousePos(e);
+    if (!pos) return;
+
+    setIsDrawing(true);
+    setStartPoint(pos);
+    setCurrentPoint(pos);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const pos = getMousePos(e);
+    if (!pos) return;
+
+    if (isDrawing) {
+      setCurrentPoint(pos);
+    } else {
+      // Check if mouse is over any annotation
+      const hoveredIndex = annotations.findIndex(rect => {
+        const isInXBounds = pos.x >= rect.x1 && pos.x <= rect.x2;
+        const isInYBounds = pos.y >= rect.y1 && pos.y <= rect.y2;
+        return isInXBounds && isInYBounds;
+      });
+      
+      setHoveredAnnotationIndex(hoveredIndex !== -1 ? hoveredIndex : null);
+    }
+  };
+
+  const handleMouseUp = async () => {
+    if (!isDrawing || !startPoint || !currentPoint || !selectedLabel) return;
+
+    // Create new annotation without ID first
+    const newAnnotation: Omit<Rectangle, 'id'> = {
+      x1: Math.min(startPoint.x, currentPoint.x),
+      y1: Math.min(startPoint.y, currentPoint.y),
+      x2: Math.max(startPoint.x, currentPoint.x),
+      y2: Math.max(startPoint.y, currentPoint.y),
+      label: selectedLabel
+    };
+
+    // Only proceed if the rectangle has some size
+    if (Math.abs(newAnnotation.x2 - newAnnotation.x1) > 0.01 && 
+        Math.abs(newAnnotation.y2 - newAnnotation.y1) > 0.01) {
+      try {
+        const token = localStorage.getItem('token');
+        const labelId = labels.find(l => l.name === selectedLabel)?.id;
+        
+        if (!labelId) {
+          throw new Error('Label not found');
+        }
+
+        const response = await fetch(`/api/images/${imageUuid}/annotations`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            label_id: labelId,
+            x: newAnnotation.x1,
+            y: newAnnotation.y1,
+            width: newAnnotation.x2 - newAnnotation.x1,
+            height: newAnnotation.y2 - newAnnotation.y1,
+            coordinate_format: 'uv'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save annotation');
+        }
+
+        // Get the created annotation with its ID from the response
+        const savedAnnotation = await response.json();
+        
+        // Add the new annotation with the server-assigned ID
+        setAnnotations([...annotations, {
+          ...newAnnotation,
+          id: savedAnnotation.id
+        }]);
+      } catch (error) {
+        console.error('Error saving annotation:', error);
+      }
+    }
+
+    // Reset drawing state
+    setIsDrawing(false);
+    setStartPoint(null);
+    setCurrentPoint(null);
+    setHoveredAnnotationIndex(null);
+  };
+
+  // Draw function
+  const draw = useCallback(() => {
+    if (!canvasRef.current || !image) return;
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
 
-    // Clear canvas and redraw image
+    // Clear canvas
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    ctx.drawImage(image, 0, 0, canvasRef.current.width, canvasRef.current.height);
 
-    // Draw saved annotations
+    // Draw image
+    ctx.drawImage(image, 0, 0, image.width * scale, image.height * scale);
+
+    // Draw all annotations
     annotations.forEach((rect, index) => {
-      const x = rect.x1 * canvasRef.current!.width;
-      const y = rect.y1 * canvasRef.current!.height;
-      const width = (rect.x2 - rect.x1) * canvasRef.current!.width;
-      const height = (rect.y2 - rect.y1) * canvasRef.current!.height;
-
-      // Draw fill for selected or hovered annotation
-      if (index === selectedAnnotationIndex || index === hoveredAnnotationIndex) {
-        ctx.fillStyle = 'rgba(128, 128, 128, 0.4)';
-        ctx.fillRect(x, y, width, height);
-      }
-
-      // Draw rectangle border
-      ctx.strokeStyle = '#00ff00';
+      ctx.strokeStyle = index === selectedAnnotationIndex ? '#00ff00' : 
+                       index === hoveredAnnotationIndex ? '#0088ff' : '#ff0000';
       ctx.lineWidth = 2;
-      ctx.strokeRect(x, y, width, height);
-      
-      // Draw label
-      ctx.fillStyle = '#00ff00';
-      ctx.font = '14px Arial';
-      ctx.fillText(
-        rect.label,
-        x,
-        y - 5
+      ctx.strokeRect(
+        rect.x1 * imageWidth * scale,
+        rect.y1 * imageHeight * scale,
+        (rect.x2 - rect.x1) * imageWidth * scale,
+        (rect.y2 - rect.y1) * imageHeight * scale
       );
+
+      // Draw label
+      if (rect.label) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(
+          rect.x1 * imageWidth * scale,
+          rect.y1 * imageHeight * scale - 20,
+          ctx.measureText(rect.label).width + 10,
+          20
+        );
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '12px Arial';
+        ctx.fillText(rect.label, rect.x1 * imageWidth * scale + 5, rect.y1 * imageHeight * scale - 5);
+      }
     });
 
     // Draw current rectangle if drawing
     if (isDrawing && startPoint && currentPoint) {
-      ctx.strokeStyle = '#00ff00';
+      ctx.strokeStyle = '#ff0000';
       ctx.lineWidth = 2;
       ctx.strokeRect(
-        startPoint.x,
-        startPoint.y,
-        currentPoint.x - startPoint.x,
-        currentPoint.y - startPoint.y
+        startPoint.x * imageWidth * scale,
+        startPoint.y * imageHeight * scale,
+        (currentPoint.x - startPoint.x) * imageWidth * scale,
+        (currentPoint.y - startPoint.y) * imageHeight * scale
       );
     }
-  }, [image, annotations, isDrawing, startPoint, currentPoint, selectedAnnotationIndex, hoveredAnnotationIndex]);
+  }, [image, annotations, isDrawing, startPoint, currentPoint, selectedAnnotationIndex, hoveredAnnotationIndex, scale, imageWidth, imageHeight]);
 
-  const isPointInRect = (point: { x: number; y: number }, rect: Rectangle, canvasWidth: number, canvasHeight: number) => {
-    const x = rect.x1 * canvasWidth;
-    const y = rect.y1 * canvasHeight;
-    const width = (rect.x2 - rect.x1) * canvasWidth;
-    const height = (rect.y2 - rect.y1) * canvasHeight;
-    
-    return point.x >= x && point.x <= x + width && point.y >= y && point.y <= y + height;
-  };
+  // Use effect to redraw when needed
+  useEffect(() => {
+    draw();
+  }, [draw]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (isDrawing) {
-      // Handle drawing
-      setCurrentPoint({ x, y });
-    } else {
-      // Handle hover detection
-      const hoveredIndex = annotations.findIndex((annotation) => 
-        isPointInRect({ x, y }, annotation, canvasRef.current!.width, canvasRef.current!.height)
-      );
-
-      if (hoveredIndex !== -1) {
-        setHoveredAnnotationIndex(hoveredIndex);
-        setSelectedAnnotationIndex(hoveredIndex);
-      } else {
-        setHoveredAnnotationIndex(null);
-        setSelectedAnnotationIndex(null);
-      }
-    }
-  };
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current || !selectedLabel) return;
-    
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (!isDrawing) {
-      // First click - start drawing
-      setIsDrawing(true);
-      setStartPoint({ x, y });
-      setCurrentPoint({ x, y });
-    } else {
-      // Second click - finish drawing
-      setCurrentPoint({ x, y });
-      
-      // Add new annotation
-      const newAnnotation: Rectangle = {
-        x1: Math.min(startPoint!.x, x) / canvasRef.current.width,
-        y1: Math.min(startPoint!.y, y) / canvasRef.current.height,
-        x2: Math.max(startPoint!.x, x) / canvasRef.current.width,
-        y2: Math.max(startPoint!.y, y) / canvasRef.current.height,
-        label: selectedLabel
-      };
-
-      setAnnotations([...annotations, newAnnotation]);
-      onAnnotationComplete([...annotations, newAnnotation]);
-
-      // Reset drawing state
-      setIsDrawing(false);
-      setStartPoint(null);
-      setCurrentPoint(null);
-    }
-  };
-
-  const handleAddLabel = (e: React.FormEvent) => {
+  const handleAddLabel = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newLabel.trim() && !labels.includes(newLabel.trim())) {
-      const newLabelValue = newLabel.trim();
-      setLabels([...labels, newLabelValue]);
-      setNewLabel('');
-      setSelectedLabel(newLabelValue);
+    if (!selectedLabel?.trim()) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/projects/${projectUuid}/labels`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: selectedLabel.trim() })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create label');
+      }
+
+      // Get the newly created label name
+      const newLabelName = selectedLabel.trim();
+
+      // Fetch updated labels
+      const labelsResponse = await fetch(`/api/projects/${projectUuid}/labels`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (labelsResponse.ok) {
+        const data = await labelsResponse.json();
+        setLabels(data);
+        // Select the newly added label
+        setSelectedLabel(newLabelName);
+      }
+
+      // Clear input
+      setSelectedLabel(newLabelName);
+    } catch (error) {
+      console.error('Error creating label:', error);
     }
   };
 
@@ -193,9 +386,10 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
   };
 
   const handleAnnotationDelete = (index: number) => {
+    const annotation = annotations[index];
+    deleteAnnotationFromBackend(annotation);
     const newAnnotations = annotations.filter((_, i) => i !== index);
     setAnnotations(newAnnotations);
-    onAnnotationComplete(newAnnotations);
     if (selectedAnnotationIndex === index) {
       setSelectedAnnotationIndex(null);
     } else if (selectedAnnotationIndex !== null && selectedAnnotationIndex > index) {
@@ -203,23 +397,39 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
     }
   };
 
-  const handleLabelDelete = (labelToDelete: string) => {
-    // Remove the label from labels list
-    setLabels(labels.filter(label => label !== labelToDelete));
-    
-    // Remove all annotations with this label
-    const newAnnotations = annotations.filter(rect => rect.label !== labelToDelete);
-    setAnnotations(newAnnotations);
-    onAnnotationComplete(newAnnotations);
+  const handleLabelDelete = async (label: Label) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/projects/${projectUuid}/labels/${label.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
-    // Clear selection if the deleted label was selected
-    if (selectedLabel === labelToDelete) {
-      setSelectedLabel(null);
-    }
+      if (!response.ok) {
+        throw new Error('Failed to delete label');
+        return;
+      }
 
-    // Clear annotation selection if the deleted label had any selected annotations
-    if (selectedAnnotationIndex !== null && annotations[selectedAnnotationIndex].label === labelToDelete) {
-      setSelectedAnnotationIndex(null);
+      // Remove the label from labels list
+      setLabels(labels.filter(l => l.id !== label.id));
+      
+      // Remove all annotations with this label
+      const newAnnotations = annotations.filter(rect => rect.label !== label.name);
+      setAnnotations(newAnnotations);
+
+      // Clear selection if the deleted label was selected
+      if (selectedLabel === label.name) {
+        setSelectedLabel(null);
+      }
+
+      // Clear annotation selection if the deleted label had any selected annotations
+      if (selectedAnnotationIndex !== null && annotations[selectedAnnotationIndex].label === label.name) {
+        setSelectedAnnotationIndex(null);
+      }
+    } catch (error) {
+      console.error('Error deleting label:', error);
     }
   };
 
@@ -235,14 +445,15 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
             <div className="flex">
               <input
                 type="text"
-                value={newLabel}
-                onChange={(e) => setNewLabel(e.target.value)}
+                value={selectedLabel || ''}
+                onChange={(e) => setSelectedLabel(e.target.value)}
                 placeholder="Add new label"
                 className="flex-1 rounded-l-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               />
               <button
                 type="submit"
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-r-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                disabled={!selectedLabel?.trim()}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-r-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 Add
               </button>
@@ -253,18 +464,18 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
           <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
             {labels.map((label) => (
               <div
-                key={label}
+                key={label.id}
                 className={`flex items-center justify-between px-3 py-2 rounded-md text-sm ${
-                  selectedLabel === label
+                  selectedLabel === label.name
                     ? 'bg-indigo-100 text-indigo-700'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 <button
-                  onClick={() => setSelectedLabel(label)}
+                  onClick={() => setSelectedLabel(label.name)}
                   className="flex-grow text-left"
                 >
-                  {label}
+                  {label.name}
                 </button>
                 <button
                   onClick={() => handleLabelDelete(label)}
@@ -281,44 +492,57 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
       </div>
 
       {/* Canvas */}
-      <div className="flex-grow flex justify-center">
+      <div className="flex-grow">
         <canvas
           ref={canvasRef}
-          className="max-w-full h-auto"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className="border border-gray-200 rounded"
         />
       </div>
 
-      {/* Annotations List */}
+      {/* Annotations List Panel */}
       <div className="w-64 ml-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Annotations</h3>
-        <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
-          {annotations.map((rect, index) => (
-            <div 
-              key={index} 
-              className={`bg-gray-50 p-2 rounded flex justify-between items-center ${
-                selectedAnnotationIndex === index ? 'ring-2 ring-indigo-500' : ''
-              }`}
-            >
-              <button
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Annotations</h3>
+          <div 
+            className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto pr-2
+            scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 
+            hover:scrollbar-thumb-gray-500"
+          >
+            {annotations.map((rect, index) => (
+              <div
+                key={index}
                 onClick={() => handleAnnotationSelect(index)}
-                className="flex-grow text-left"
+                className={`bg-white p-3 rounded-md shadow-sm border cursor-pointer
+                  ${selectedAnnotationIndex === index 
+                    ? 'border-indigo-500' 
+                    : 'border-gray-200 hover:border-gray-300'
+                  }`}
               >
-                <span className="text-sm text-gray-600">
-                  {rect.label}: ({rect.x1.toFixed(3)}, {rect.y1.toFixed(3)}) - ({rect.x2.toFixed(3)}, {rect.y2.toFixed(3)})
-                </span>
-              </button>
-              <button
-                onClick={() => handleAnnotationDelete(index)}
-                className="ml-2 text-gray-400 hover:text-red-500"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-          ))}
+                <div className="flex justify-between items-start">
+                  <span className="font-medium text-sm text-gray-900">{rect.label}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAnnotationDelete(index);
+                    }}
+                    className="text-gray-400 hover:text-red-500"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  <div>Top-left: ({rect.x1.toFixed(3)}, {rect.y1.toFixed(3)})</div>
+                  <div>Bottom-right: ({rect.x2.toFixed(3)}, {rect.y2.toFixed(3)})</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
