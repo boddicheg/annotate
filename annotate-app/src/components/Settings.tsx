@@ -114,11 +114,8 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">Account Settings</h2>
-        </div>
+    <div className="max-w mx-auto">
+      <div className="m-6 bg-white shadow-md rounded-lg overflow-hidden">
         
         {error && (
           <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">

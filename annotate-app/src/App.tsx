@@ -19,10 +19,14 @@ const MainContent = ({ children }: { children: React.ReactNode }) => {
   
   // Apply different padding for create project page
   const getPadding = () => {
+    console.log(location.pathname);
     if (location.pathname === "/projects/create") {
       return "p-4 md:p-6";
     }
-    return "p-6";
+    if (location.pathname === "/projects") {
+      return "p-6";
+    }
+    return "";
   };
   
   return (
@@ -75,7 +79,6 @@ function App() {
                 <div className="flex min-h-screen bg-gray-50">
                   <Sidebar />
                   <div className="flex-1">
-                    <Header />
                     <MainContent><ProjectDetail /></MainContent>
                   </div>
                 </div>

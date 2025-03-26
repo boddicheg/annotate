@@ -67,20 +67,8 @@ const CreateProject: React.FC = () => {
 
   return (
     <div className="w-full">
-      <div className="mb-8">
-        <button
-          onClick={() => navigate('/projects')}
-          className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to Projects
-        </button>
-      </div>
       
       <div className="bg-white shadow-md rounded-lg p-6 md:p-8">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-8">Create New Project</h1>
         
         {error && (
           <div className="mb-8 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">

@@ -57,7 +57,7 @@ export const ProjectsList = ({
   }, []);
   
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4" ref={dropdownRef}>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" ref={dropdownRef}>
       {projects &&
         projects?.map((project) => (
           <div 

@@ -171,7 +171,7 @@ const ProjectDetail: React.FC = () => {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-grow p-4 bg-gray-50 overflow-auto">
+      <div className="flex-grow bg-gray-50 overflow-auto">
         {activeTab === 'upload' && (
           <div>
             <div className="bg-white p-6 rounded shadow">
