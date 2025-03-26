@@ -24,6 +24,8 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
   const [labels, setLabels] = useState<string[]>([]);
   const [newLabel, setNewLabel] = useState('');
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [selectedAnnotationIndex, setSelectedAnnotationIndex] = useState<number | null>(null);
+  const [hoveredAnnotationIndex, setHoveredAnnotationIndex] = useState<number | null>(null);
 
   // Load image and calculate scale
   useEffect(() => {
@@ -66,23 +68,30 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
     ctx.drawImage(image, 0, 0, canvasRef.current.width, canvasRef.current.height);
 
     // Draw saved annotations
-    ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 2;
-    annotations.forEach(rect => {
-      ctx.strokeRect(
-        rect.x1 * canvasRef.current!.width,
-        rect.y1 * canvasRef.current!.height,
-        (rect.x2 - rect.x1) * canvasRef.current!.width,
-        (rect.y2 - rect.y1) * canvasRef.current!.height
-      );
+    annotations.forEach((rect, index) => {
+      const x = rect.x1 * canvasRef.current!.width;
+      const y = rect.y1 * canvasRef.current!.height;
+      const width = (rect.x2 - rect.x1) * canvasRef.current!.width;
+      const height = (rect.y2 - rect.y1) * canvasRef.current!.height;
+
+      // Draw fill for selected or hovered annotation
+      if (index === selectedAnnotationIndex || index === hoveredAnnotationIndex) {
+        ctx.fillStyle = 'rgba(128, 128, 128, 0.4)';
+        ctx.fillRect(x, y, width, height);
+      }
+
+      // Draw rectangle border
+      ctx.strokeStyle = '#00ff00';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, width, height);
       
       // Draw label
       ctx.fillStyle = '#00ff00';
       ctx.font = '14px Arial';
       ctx.fillText(
         rect.label,
-        rect.x1 * canvasRef.current!.width,
-        rect.y1 * canvasRef.current!.height - 5
+        x,
+        y - 5
       );
     });
 
@@ -97,7 +106,42 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
         currentPoint.y - startPoint.y
       );
     }
-  }, [image, annotations, isDrawing, startPoint, currentPoint]);
+  }, [image, annotations, isDrawing, startPoint, currentPoint, selectedAnnotationIndex, hoveredAnnotationIndex]);
+
+  const isPointInRect = (point: { x: number; y: number }, rect: Rectangle, canvasWidth: number, canvasHeight: number) => {
+    const x = rect.x1 * canvasWidth;
+    const y = rect.y1 * canvasHeight;
+    const width = (rect.x2 - rect.x1) * canvasWidth;
+    const height = (rect.y2 - rect.y1) * canvasHeight;
+    
+    return point.x >= x && point.x <= x + width && point.y >= y && point.y <= y + height;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (isDrawing) {
+      // Handle drawing
+      setCurrentPoint({ x, y });
+    } else {
+      // Handle hover detection
+      const hoveredIndex = annotations.findIndex((annotation) => 
+        isPointInRect({ x, y }, annotation, canvasRef.current!.width, canvasRef.current!.height)
+      );
+
+      if (hoveredIndex !== -1) {
+        setHoveredAnnotationIndex(hoveredIndex);
+        setSelectedAnnotationIndex(hoveredIndex);
+      } else {
+        setHoveredAnnotationIndex(null);
+        setSelectedAnnotationIndex(null);
+      }
+    }
+  };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !selectedLabel) return;
@@ -134,16 +178,6 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !canvasRef.current) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    setCurrentPoint({ x, y });
-  };
-
   const handleAddLabel = (e: React.FormEvent) => {
     e.preventDefault();
     if (newLabel.trim() && !labels.includes(newLabel.trim())) {
@@ -151,6 +185,41 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
       setLabels([...labels, newLabelValue]);
       setNewLabel('');
       setSelectedLabel(newLabelValue);
+    }
+  };
+
+  const handleAnnotationSelect = (index: number) => {
+    setSelectedAnnotationIndex(selectedAnnotationIndex === index ? null : index);
+  };
+
+  const handleAnnotationDelete = (index: number) => {
+    const newAnnotations = annotations.filter((_, i) => i !== index);
+    setAnnotations(newAnnotations);
+    onAnnotationComplete(newAnnotations);
+    if (selectedAnnotationIndex === index) {
+      setSelectedAnnotationIndex(null);
+    } else if (selectedAnnotationIndex !== null && selectedAnnotationIndex > index) {
+      setSelectedAnnotationIndex(selectedAnnotationIndex - 1);
+    }
+  };
+
+  const handleLabelDelete = (labelToDelete: string) => {
+    // Remove the label from labels list
+    setLabels(labels.filter(label => label !== labelToDelete));
+    
+    // Remove all annotations with this label
+    const newAnnotations = annotations.filter(rect => rect.label !== labelToDelete);
+    setAnnotations(newAnnotations);
+    onAnnotationComplete(newAnnotations);
+
+    // Clear selection if the deleted label was selected
+    if (selectedLabel === labelToDelete) {
+      setSelectedLabel(null);
+    }
+
+    // Clear annotation selection if the deleted label had any selected annotations
+    if (selectedAnnotationIndex !== null && annotations[selectedAnnotationIndex].label === labelToDelete) {
+      setSelectedAnnotationIndex(null);
     }
   };
 
@@ -183,17 +252,29 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
           {/* Labels list */}
           <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
             {labels.map((label) => (
-              <button
+              <div
                 key={label}
-                onClick={() => setSelectedLabel(label)}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm ${
+                className={`flex items-center justify-between px-3 py-2 rounded-md text-sm ${
                   selectedLabel === label
                     ? 'bg-indigo-100 text-indigo-700'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                {label}
-              </button>
+                <button
+                  onClick={() => setSelectedLabel(label)}
+                  className="flex-grow text-left"
+                >
+                  {label}
+                </button>
+                <button
+                  onClick={() => handleLabelDelete(label)}
+                  className="ml-2 text-gray-400 hover:text-red-500"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -214,10 +295,28 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({ imageUrl, onAnnotat
         <h3 className="text-lg font-medium text-gray-900 mb-2">Annotations</h3>
         <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
           {annotations.map((rect, index) => (
-            <div key={index} className="bg-gray-50 p-2 rounded">
-              <span className="text-sm text-gray-600">
-                {rect.label}: ({rect.x1.toFixed(3)}, {rect.y1.toFixed(3)}) - ({rect.x2.toFixed(3)}, {rect.y2.toFixed(3)})
-              </span>
+            <div 
+              key={index} 
+              className={`bg-gray-50 p-2 rounded flex justify-between items-center ${
+                selectedAnnotationIndex === index ? 'ring-2 ring-indigo-500' : ''
+              }`}
+            >
+              <button
+                onClick={() => handleAnnotationSelect(index)}
+                className="flex-grow text-left"
+              >
+                <span className="text-sm text-gray-600">
+                  {rect.label}: ({rect.x1.toFixed(3)}, {rect.y1.toFixed(3)}) - ({rect.x2.toFixed(3)}, {rect.y2.toFixed(3)})
+                </span>
+              </button>
+              <button
+                onClick={() => handleAnnotationDelete(index)}
+                className="ml-2 text-gray-400 hover:text-red-500"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
             </div>
           ))}
         </div>
