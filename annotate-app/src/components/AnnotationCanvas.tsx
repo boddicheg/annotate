@@ -95,36 +95,6 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     }
   }, [imageUuid, imageWidth, imageHeight]);
 
-  // Save annotation to backend
-  const saveAnnotation = async (annotation: Rectangle) => {
-    try {
-      const token = localStorage.getItem('token');
-      const labelId = labels.find(l => l.name === annotation.label)?.id || 0; // Assuming label IDs start from 1
-      
-      const response = await fetch(`/api/images/${imageUuid}/annotations`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          label_id: labelId,
-          x: annotation.x1,
-          y: annotation.y1,
-          width: annotation.x2 - annotation.x1,
-          height: annotation.y2 - annotation.y1,
-          coordinate_format: 'uv' // Indicate that we're sending UV coordinates
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save annotation');
-      }
-    } catch (error) {
-      console.error('Error saving annotation:', error);
-    }
-  };
-
   // Delete annotation from backend
   const deleteAnnotationFromBackend = async (annotation: Rectangle) => {
     try {
